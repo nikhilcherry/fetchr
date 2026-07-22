@@ -19,6 +19,23 @@ parallel, crash-safe "run one function over many items" machinery, rather
 than reimplementing it: `fetchr sync`'s per-row worker
 (download-from-Kaggle-or-rebuild-then-verify) is exactly `batchr`'s job.
 
+```mermaid
+flowchart TD
+    M["manifest.csv\n(arvyo-data, source of truth)"] --> S["fetchr sync"]
+    S --> K{"row present in\nKaggle dataset?"}
+    K -->|"yes (fast path)"| DL["download from Kaggle"]
+    K -->|"no, and\n--rebuild-missing"| RB["rebuild from MAST\n(lightkurve, per-target)"]
+    K -->|"no, no rebuild flag"| MISS["reported missing"]
+    DL --> V["verify against\nschema-1.0 contract"]
+    RB --> V
+    V -->|valid| OUT["data/processed/*.npz"]
+    V -->|invalid| FAIL["schema_invalid"]
+```
+
+Every file `fetchr` writes has already passed the schema-1.0 check by the
+time `sync` reports success — "the sync finished" and "the data is valid"
+are the same claim, not two separate things you have to check.
+
 ## Install
 
 ```bash
@@ -99,6 +116,25 @@ per-run configuration (the manifest rows, the Kaggle tic_id index,
 environment variable, set in the parent process just before calling
 `run_batch`. See `fetchr/_worker.py`'s module docstring for the full
 reasoning.
+
+```mermaid
+sequenceDiagram
+    participant P as fetchr.sync() (parent)
+    participant E as env: FETCHR_SYNC_CONFIG
+    participant W as batchr worker (subprocess)
+    P->>E: write config JSON, set env var
+    P->>W: run_batch(sync_one_item, tic_ids)
+    loop each tic_id (parallel)
+        W->>E: read FETCHR_SYNC_CONFIG path
+        W->>W: download-from-Kaggle-or-rebuild, then verify
+        W-->>P: result (cached by batchr's content hash)
+    end
+```
+
+`ProcessPoolExecutor` workers inherit the parent's environment at
+process-creation time (true for both the "fork" and "spawn" start
+methods), so this works regardless of platform without any other
+inter-process channel.
 
 Resumability comes from `batchr` for free: item + worker source + a small
 config dict (`output_dir`, `kaggle_dataset`, `rebuild_missing`) are hashed
