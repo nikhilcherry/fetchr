@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fetchr"
+version = "0.1.0"
+description = "Contract-aware dataset acquisition: reconstruct arvyo-data's processed .npz corpus from Kaggle, falling back to a per-target MAST rebuild."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "batchr @ git+https://github.com/nikhilcherry/batchr",
+    "pandas",
+    "numpy",
+]
+
+[project.optional-dependencies]
+kaggle = [
+    "kaggle",
+]
+# lightkurve is the extra named in the fetchr task handout; astropy and
+# wotan are pulled in alongside it because mast_source.py reuses
+# arvyo-data's 02_download_lightcurves.py / 03_preprocess.py (and the
+# Kepler 05/06 equivalents) rather than reimplementing them, and those
+# scripts themselves import astropy and wotan. See mast_source.py's
+# module docstring.
+rebuild = [
+    "lightkurve>=2.4",
+    "astropy",
+    "wotan",
+]
+dev = [
+    "pytest",
+]
+
+[project.scripts]
+fetchr = "fetchr.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["fetchr*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
