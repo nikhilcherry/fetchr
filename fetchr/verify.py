@@ -90,8 +90,8 @@ def load_and_validate(path: str | Path) -> dict:
             sample[key] = _scalar(npz[key])
 
     # Sanity checks -- matches arvyo-data/scripts/verify_dataset.py's spot_check().
-    if np.isnan(flux).any() or np.isnan(time).any():
-        raise ContractError(f"{path}: NaNs present in time/flux")
+    if np.isnan(flux).any() or np.isnan(time).any() or np.isnan(flux_err).any():
+        raise ContractError(f"{path}: NaNs present in time/flux/flux_err")
     med = np.nanmedian(flux)
     if not np.isclose(med, 1.0, atol=FLUX_MEDIAN_ATOL):
         raise ContractError(f"{path}: median flux {med:.4f} != 1.0 (atol={FLUX_MEDIAN_ATOL})")

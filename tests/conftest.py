@@ -14,12 +14,17 @@ def _write_npz(path, **arrays):
 def make_npz(tmp_path):
     """Factory: write a schema-1.0-valid .npz at data_dir/{label}/{tic_id}.npz."""
 
-    def _make(data_dir, label, tic_id, n=50, median_flux=1.0, with_nan=False, **extra):
+    def _make(
+        data_dir, label, tic_id, n=50, median_flux=1.0,
+        with_nan=False, with_flux_err_nan=False, **extra,
+    ):
         time = np.linspace(0, 10, n)
         flux = np.full(n, median_flux)
         if with_nan:
             flux[0] = np.nan
         flux_err = np.full(n, 0.001)
+        if with_flux_err_nan:
+            flux_err[0] = np.nan
         path = data_dir / label / f"{tic_id}.npz"
         arrays = dict(
             time=time, flux=flux, flux_err=flux_err,

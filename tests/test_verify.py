@@ -41,6 +41,12 @@ def test_load_and_validate_rejects_nans(tmp_path, make_npz):
         verify.load_and_validate(path)
 
 
+def test_load_and_validate_rejects_flux_err_nans(tmp_path, make_npz):
+    path = make_npz(tmp_path, "planet", 1, with_flux_err_nan=True)
+    with pytest.raises(ContractError, match="NaNs"):
+        verify.load_and_validate(path)
+
+
 def test_load_and_validate_rejects_bad_median_flux(tmp_path, make_npz):
     path = make_npz(tmp_path, "planet", 1, median_flux=1.5)
     with pytest.raises(ContractError, match="median flux"):
