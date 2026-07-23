@@ -177,7 +177,14 @@ def rebuild_one(
 
     out_path = Path(output_dir) / str(label) / f"{tic_id}.npz"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = out_path.with_name(out_path.name + ".tmp")
+    # Unique-per-call tmp name: two independently invoked `fetchr sync
+    # --rebuild-missing` (or `fetchr rebuild`) processes racing on the same
+    # tic_id would otherwise both write to the exact same deterministic
+    # tmp path, and one's os.replace() could find the other's tmp file
+    # already gone.
+    fd, tmp_name = tempfile.mkstemp(dir=out_path.parent, prefix=f".{out_path.name}-", suffix=".tmp")
+    os.close(fd)
+    tmp_path = Path(tmp_name)
     with open(tmp_path, "wb") as f:
         np.savez(f, **result)
     os.replace(tmp_path, out_path)

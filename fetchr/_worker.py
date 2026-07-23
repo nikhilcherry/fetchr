@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import tempfile
 from pathlib import Path
 
 from . import mast_source, verify
@@ -81,7 +82,16 @@ def sync_one_item(tic_id: str) -> dict:
     kaggle_path = config["kaggle_index"].get(tic_id)
     if kaggle_path is not None:
         target_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_path = target_path.with_name(target_path.name + ".tmp")
+        # Unique-per-call tmp name, not just per target_path: two
+        # independently invoked `fetchr sync` processes racing on the same
+        # tic_id (same output_dir) would otherwise both write to the exact
+        # same deterministic tmp path, and one's os.replace() could find
+        # the other's tmp file already gone.
+        fd, tmp_name = tempfile.mkstemp(
+            dir=target_path.parent, prefix=f".{target_path.name}-", suffix=".tmp"
+        )
+        os.close(fd)
+        tmp_path = Path(tmp_name)
         shutil.copyfile(kaggle_path, tmp_path)
         os.replace(tmp_path, target_path)
         source = "kaggle"

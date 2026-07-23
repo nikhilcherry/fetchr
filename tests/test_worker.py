@@ -60,6 +60,41 @@ def test_sync_one_item_copies_from_kaggle(tmp_path, monkeypatch):
     verify.load_and_validate(dest)  # doesn't raise
 
 
+def test_sync_one_item_concurrent_writers_same_tic_id_do_not_crash(tmp_path, monkeypatch):
+    # Two independently invoked `fetchr sync` processes racing on the same
+    # tic_id (e.g. two people syncing the same manifest at once) used to
+    # both write to the exact same deterministic "<target>.tmp" path --
+    # one's os.replace() could then find the other's tmp file already
+    # gone, crashing with FileNotFoundError instead of completing.
+    import threading
+
+    output_dir = tmp_path / "out"
+    kaggle_file = tmp_path / "staging" / "planet" / "42.npz"
+    _write_source_npz(kaggle_file, 42, "planet", n=5000)  # largish: widen the race window
+
+    rows = {"42": {"tic_id": 42, "label": "planet"}}
+    config_path = _write_config(tmp_path, output_dir, rows, {"42": str(kaggle_file)})
+    monkeypatch.setenv("FETCHR_SYNC_CONFIG", str(config_path))
+
+    errors = []
+
+    def worker():
+        try:
+            _worker.sync_one_item("42")
+        except Exception as exc:
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert errors == []
+    dest = verify.expected_path(output_dir, "planet", 42)
+    verify.load_and_validate(dest)  # the final file is intact, not corrupted
+
+
 def test_sync_one_item_skips_existing_valid_file(tmp_path, monkeypatch):
     output_dir = tmp_path / "out"
     dest = verify.expected_path(output_dir, "planet", 42)
