@@ -13,7 +13,7 @@ from fetchr import _worker
 verify = importlib.import_module("fetchr.verify")
 
 
-def _write_config(tmp_path, output_dir, rows, kaggle_index, rebuild_missing=False):
+def _write_config(tmp_path, output_dir, rows, kaggle_index, rebuild_missing=False, force=False):
     config = {
         "output_dir": str(output_dir),
         "rebuild_missing": rebuild_missing,
@@ -21,6 +21,7 @@ def _write_config(tmp_path, output_dir, rows, kaggle_index, rebuild_missing=Fals
         "arvyo_data_path": None,
         "kaggle_index": kaggle_index,
         "rows": rows,
+        "force": force,
     }
     config_path = tmp_path / "sync_worker_config.json"
     config_path.write_text(json.dumps(config))
@@ -34,9 +35,8 @@ def _reset_worker_cache(monkeypatch, tmp_path):
     _worker.reset_config_cache()
 
 
-def _write_source_npz(path, tic_id, label):
+def _write_source_npz(path, tic_id, label, n=20):
     path.parent.mkdir(parents=True, exist_ok=True)
-    n = 20
     with open(path, "wb") as f:
         np.savez(
             f, time=np.linspace(0, 1, n), flux=np.ones(n), flux_err=np.full(n, 0.01),
@@ -72,6 +72,28 @@ def test_sync_one_item_skips_existing_valid_file(tmp_path, monkeypatch):
 
     result = _worker.sync_one_item("42")
     assert result["source"] == "existing"
+
+
+def test_sync_one_item_force_redoes_existing_valid_file(tmp_path, monkeypatch):
+    # sync(..., force=True) is documented ("pass force=True to redo
+    # everything") to redo already-present files, not just bypass batchr's
+    # own cache -- sync_one_item's own "already exists and valid" shortcut
+    # must not silently win over that regardless.
+    output_dir = tmp_path / "out"
+    dest = verify.expected_path(output_dir, "planet", 42)
+    _write_source_npz(dest, 42, "planet", n=20)  # distinguishable size from the kaggle source below
+
+    kaggle_file = tmp_path / "staging" / "planet" / "42.npz"
+    _write_source_npz(kaggle_file, 42, "planet", n=30)
+
+    rows = {"42": {"tic_id": 42, "label": "planet"}}
+    config_path = _write_config(tmp_path, output_dir, rows, {"42": str(kaggle_file)}, force=True)
+    monkeypatch.setenv("FETCHR_SYNC_CONFIG", str(config_path))
+
+    result = _worker.sync_one_item("42")
+    assert result["source"] == "kaggle"
+    # the file on disk was genuinely replaced by the kaggle copy, not left as-is
+    assert len(np.load(dest)["time"]) == 30
 
 
 def test_sync_one_item_raises_missing_source_when_rebuild_disabled(tmp_path, monkeypatch):

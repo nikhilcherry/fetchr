@@ -114,6 +114,7 @@ def sync(
         "arvyo_data_path": str(Path(arvyo_data_path).resolve()) if arvyo_data_path else None,
         "kaggle_index": kaggle_index,
         "rows": rows,
+        "force": bool(force),
     }
     config_path = cache_dir / "sync_worker_config.json"
     with open(config_path, "w") as f:

@@ -71,7 +71,7 @@ def sync_one_item(tic_id: str) -> dict:
     output_dir = config["output_dir"]
     target_path = verify.expected_path(output_dir, label, tic_id)
 
-    if target_path.exists():
+    if target_path.exists() and not config.get("force", False):
         try:
             verify.load_and_validate(target_path)
             return {"tic_id": tic_id, "source": "existing", "path": str(target_path)}
