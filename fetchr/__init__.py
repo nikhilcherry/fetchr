@@ -39,6 +39,7 @@ class SyncReport:
     total: int
     from_kaggle: int
     from_mast: int
+    from_existing: int
     failed: int
     wall_time_s: float
     results: list = field(default_factory=list)
@@ -49,8 +50,8 @@ class SyncReport:
     def summary(self) -> str:
         return (
             f"{self.total} item(s): {self.from_kaggle} from kaggle, "
-            f"{self.from_mast} from mast, {self.failed} failed, "
-            f"in {self.wall_time_s:.2f}s."
+            f"{self.from_mast} from mast, {self.from_existing} already present, "
+            f"{self.failed} failed, in {self.wall_time_s:.2f}s."
         )
 
 
@@ -138,7 +139,7 @@ def sync(
         force=force,
     )
 
-    from_kaggle = from_mast = 0
+    from_kaggle = from_mast = from_existing = 0
     results = []
     for r in batch_report.results:
         if r.status == "failed":
@@ -150,12 +151,15 @@ def sync(
             from_kaggle += 1
         elif source == "mast":
             from_mast += 1
+        elif source == "existing":
+            from_existing += 1
         results.append({"tic_id": r.item, "status": r.status, "source": source, "error": None})
 
     return SyncReport(
         total=batch_report.total,
         from_kaggle=from_kaggle,
         from_mast=from_mast,
+        from_existing=from_existing,
         failed=batch_report.failed,
         wall_time_s=batch_report.wall_time_s,
         results=results,
