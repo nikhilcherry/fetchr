@@ -4,6 +4,7 @@ import importlib
 import shutil
 
 import numpy as np
+import pytest
 
 import fetchr
 from fetchr import kaggle_source
@@ -39,6 +40,22 @@ def test_sync_counts_pre_existing_valid_files(tmp_path, manifest_csv, make_npz):
         report.from_kaggle + report.from_mast + report.from_existing + report.failed
         == report.total
     )
+
+
+def test_sync_rejects_negative_limit(tmp_path, manifest_csv, make_npz):
+    # manifest.head(limit) with a negative limit is pandas' own
+    # negative-slice convention -- "all rows except the last |limit|" --
+    # not "no limit" and not an error, silently syncing a confidently
+    # wrong subset instead of the documented "first N manifest rows".
+    output_dir = tmp_path / "out"
+    make_npz(output_dir, "planet", 42)
+    manifest = manifest_csv([{"tic_id": 42, "label": "planet"}])
+
+    with pytest.raises(ValueError, match="limit must be >= 0"):
+        fetchr.sync(
+            manifest, output_dir=output_dir, cache_dir=tmp_path / ".fetchr_cache",
+            workers=1, limit=-1,
+        )
 
 
 def test_sync_force_redoes_pre_existing_valid_files(tmp_path, manifest_csv, make_npz, monkeypatch):

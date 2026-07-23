@@ -86,6 +86,13 @@ def sync(
     changes to the *contents* of an already-downloaded Kaggle dataset are
     not auto-detected (pass ``force=True`` to redo everything).
     """
+    if limit is not None and limit < 0:
+        # manifest.head(limit) with a negative limit is pandas' own
+        # negative-slice convention -- "all but the last |limit| rows" --
+        # not "no limit" or an error, silently syncing a confidently wrong
+        # subset of rows instead of the documented "first N rows".
+        raise ValueError(f"limit must be >= 0, got {limit}")
+
     manifest = pd.read_csv(manifest_path, keep_default_na=False, na_values=[""])
     if limit:
         manifest = manifest.head(limit)
