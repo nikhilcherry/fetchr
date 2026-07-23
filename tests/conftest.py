@@ -14,7 +14,7 @@ def _write_npz(path, **arrays):
 def make_npz(tmp_path):
     """Factory: write a schema-1.0-valid .npz at data_dir/{label}/{tic_id}.npz."""
 
-    def _make(data_dir, label, tic_id, n=50, median_flux=1.0, with_nan=False, **extra):
+    def _make(data_dir, label, tic_id, n=1000, median_flux=1.0, with_nan=False, **extra):
         time = np.linspace(0, 10, n)
         flux = np.full(n, median_flux)
         if with_nan:

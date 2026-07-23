@@ -36,7 +36,7 @@ def _reset_worker_cache(monkeypatch, tmp_path):
 
 def _write_source_npz(path, tic_id, label):
     path.parent.mkdir(parents=True, exist_ok=True)
-    n = 20
+    n = 1000
     with open(path, "wb") as f:
         np.savez(
             f, time=np.linspace(0, 1, n), flux=np.ones(n), flux_err=np.full(n, 0.01),

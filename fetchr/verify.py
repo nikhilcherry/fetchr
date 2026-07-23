@@ -3,9 +3,13 @@
 Structural checks mirror arvyo-pipeline/arvyo/contract.py's load_sample()
 (validated against fetchr/schema.py's copied constants, not by importing
 arvyo.contract -- see schema.py's docstring for why). Sanity checks (NaNs,
-median flux ~= 1.0) mirror arvyo-data/scripts/verify_dataset.py's
-spot_check(), same tolerance (atol=0.05), so the two repos and fetchr never
-disagree about what counts as a valid file.
+infs, median flux ~= 1.0, minimum cadence count) mirror arvyo-data/scripts/
+verify_dataset.py's spot_check(), same thresholds (atol=0.05, 1000
+cadences), so the two repos and fetchr never disagree about what counts as
+a valid file. The infinite-value check has no counterpart in spot_check()
+-- it's a fetchr-only addition, since an Inf silently breaks downstream
+training in ways NaN checks alone won't catch, and checking for it costs
+nothing extra given the arrays are already in hand.
 """
 
 from __future__ import annotations
@@ -20,6 +24,7 @@ import pandas as pd
 from . import schema
 
 FLUX_MEDIAN_ATOL = 0.05  # matches arvyo-data/scripts/verify_dataset.py
+MIN_CADENCES = 1000  # matches arvyo-data/scripts/verify_dataset.py's spot_check()
 
 
 class ContractError(ValueError):
@@ -92,9 +97,13 @@ def load_and_validate(path: str | Path) -> dict:
     # Sanity checks -- matches arvyo-data/scripts/verify_dataset.py's spot_check().
     if np.isnan(flux).any() or np.isnan(time).any():
         raise ContractError(f"{path}: NaNs present in time/flux")
+    if np.isinf(flux).any() or np.isinf(time).any() or np.isinf(flux_err).any():
+        raise ContractError(f"{path}: infinite values present in time/flux/flux_err")
     med = np.nanmedian(flux)
     if not np.isclose(med, 1.0, atol=FLUX_MEDIAN_ATOL):
         raise ContractError(f"{path}: median flux {med:.4f} != 1.0 (atol={FLUX_MEDIAN_ATOL})")
+    if len(flux) < MIN_CADENCES:
+        raise ContractError(f"{path}: only {len(flux)} cadences (<{MIN_CADENCES})")
 
     return sample
 

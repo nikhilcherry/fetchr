@@ -61,9 +61,26 @@ def test_load_and_validate_rejects_unknown_label(tmp_path):
 
 
 def test_load_and_validate_accepts_optional_flux_raw(tmp_path, make_npz):
-    path = make_npz(tmp_path, "starspot", 1, flux_raw=np.ones(50))
+    path = make_npz(tmp_path, "starspot", 1, flux_raw=np.ones(1000))
     sample = verify.load_and_validate(path)
     assert "flux_raw" in sample
+
+
+def test_load_and_validate_rejects_too_few_cadences(tmp_path, make_npz):
+    path = make_npz(tmp_path, "planet", 1, n=999)
+    with pytest.raises(ContractError, match="cadences"):
+        verify.load_and_validate(path)
+
+
+def test_load_and_validate_rejects_infs(tmp_path, make_npz):
+    path = make_npz(tmp_path, "planet", 1)
+    with np.load(path, allow_pickle=True) as npz:
+        arrays = {k: npz[k] for k in npz.files}
+    arrays["flux"][0] = np.inf
+    with open(path, "wb") as f:
+        np.savez(f, **arrays)
+    with pytest.raises(ContractError, match="infinite"):
+        verify.load_and_validate(path)
 
 
 def test_expected_path_matches_arvyo_data_layout():
