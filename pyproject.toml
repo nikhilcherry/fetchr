@@ -41,3 +41,7 @@ include = ["fetchr*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# fetchr/ sits at the repo root, but pytest's prepend import mode only puts
+# tests/ on sys.path — so `import fetchr` failed unless the package happened to
+# be pip-installed. Put the root on sys.path explicitly.
+pythonpath = ["."]
